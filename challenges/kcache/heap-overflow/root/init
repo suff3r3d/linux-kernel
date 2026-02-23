@@ -1,0 +1,52 @@
+#!/bin/sh
+
+# 1. Essential Filesystems
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+# 2. Load the Challenge Module
+if [ -f /challenge.ko ]; then
+    echo "[!] Loading challenge module..."
+    insmod /challenge.ko
+    
+    # --- NEW: DEVICE SETUP ---
+    # Give the kernel a moment to register the device
+    sleep 0.5 
+    
+    # Option A: If the driver creates its own node in /dev/
+    # We just need to fix permissions so UID 1000 can talk to it.
+    # Replace 'challenge_device' with the actual name in /dev/
+    chmod 666 /dev/challenge_device 2>/dev/null
+    
+    # Option B: If the driver DOES NOT create a node (Manual creation)
+    # We find the Major number from /proc/devices and mknod it.
+    MAJOR=$(grep "challenge" /proc/devices | cut -d' ' -f1)
+    if [ ! -z "$MAJOR" ]; then
+        # mknod /dev/challenge c $MAJOR 0
+        chmod 666 /dev/challenge
+        echo "[+] Device node /dev/challenge created with Major $MAJOR"
+    fi
+    # -------------------------
+
+else
+    echo "[!] Warning: /challenge.ko not found!"
+fi
+
+# 3. Security Hardening
+echo 0 > /proc/sys/kernel/kptr_restrict
+echo 0 > /proc/sys/kernel/dmesg_restrict
+
+sysctl -w debug.exception-trace=1
+
+# 4. Challenge Setup
+chown 0:0 /flag
+chmod 400 /flag
+
+# 5. Drop to User Shell
+echo "--- Kernel Challenge Loaded ---"
+# The device is now accessible to this shell
+setsid cttyhack setuidgid 1000 /bin/sh
+
+# 6. Cleanup
+poweroff -d 0 -f

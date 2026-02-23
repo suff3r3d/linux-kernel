@@ -1,0 +1,33 @@
+#!/bin/sh
+
+# 1. Essential Filesystems
+mount -t proc proc /proc
+mount -t sysfs sysfs /sys
+mount -t devtmpfs devtmpfs /dev
+
+# 2. Load the Challenge Module
+# Check if the file exists before attempting to load
+if [ -f /challenge.ko ]; then
+    echo "[!] Loading challenge module..."
+    insmod /challenge.ko
+else
+    echo "[!] Warning: /challenge.ko not found!"
+fi
+
+# 3. Security Hardening (Standard for Kernel CTFs)
+# Disable Kptr leak protection so you can see addresses in /proc/kallsyms
+echo 0 > /proc/sys/kernel/kptr_restrict
+# Disable dmesg restriction so you can see your printk output
+echo 0 > /proc/sys/kernel/dmesg_restrict
+
+# 4. Challenge Setup
+chown 0:0 /flag
+chmod 400 /flag
+
+# 5. Drop to User Shell
+# Note: Using 'setsid cttyhack' helps with Ctrl+C support
+echo "--- Kernel Challenge Loaded ---"
+setsid cttyhack setuidgid 1000 /bin/sh
+
+# 6. Cleanup
+poweroff -d 0 -f
